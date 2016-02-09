@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.6.1-rc1 (2016-02-05)
+- Fixes https://github.com/docker/docker/issues/20026
+
+## 0.6.0-rc7 (2016-02-01)
+- Allow inter-network connections via exposed ports
+
+## 0.6.0-rc6 (2016-01-30)
+- Properly fixes https://github.com/docker/docker/issues/18814
+
 ## 0.6.0-rc5 (2016-01-26)
 - Cleanup stale overlay sandboxes
 

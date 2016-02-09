@@ -114,18 +114,16 @@ func (s *DockerSuite) TestBuildEnvironmentReplacementUser(c *check.C) {
 func (s *DockerSuite) TestBuildEnvironmentReplacementVolume(c *check.C) {
 	name := "testbuildenvironmentreplacement"
 
-	var baseImage, volumePath string
+	var volumePath string
 
 	if daemonPlatform == "windows" {
-		baseImage = "windowsservercore"
 		volumePath = "c:/quux"
 	} else {
-		baseImage = "scratch"
 		volumePath = "/quux"
 	}
 
 	_, err := buildImage(name, `
-  FROM `+baseImage+`
+  FROM `+minimalBaseImage()+`
   ENV volume `+volumePath+`
   VOLUME ${volume}
   `, true)
@@ -201,16 +199,8 @@ func (s *DockerSuite) TestBuildEnvironmentReplacementWorkdir(c *check.C) {
 func (s *DockerSuite) TestBuildEnvironmentReplacementAddCopy(c *check.C) {
 	name := "testbuildenvironmentreplacement"
 
-	var baseImage string
-
-	if daemonPlatform == "windows" {
-		baseImage = "windowsservercore"
-	} else {
-		baseImage = "scratch"
-	}
-
 	ctx, err := fakeContext(`
-  FROM `+baseImage+`
+  FROM `+minimalBaseImage()+`
   ENV baz foo
   ENV quux bar
   ENV dot .
@@ -534,7 +524,6 @@ func (s *DockerSuite) TestBuildOnBuildForbiddenChainedInSourceImage(c *check.C) 
 }
 
 func (s *DockerSuite) TestBuildOnBuildCmdEntrypointJSON(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name1 := "onbuildcmd"
 	name2 := "onbuildgenerated"
 
@@ -555,16 +544,15 @@ ONBUILD RUN ["true"]`,
 		c.Fatal(err)
 	}
 
-	out, _ := dockerCmd(c, "run", "-t", name2)
+	out, _ := dockerCmd(c, "run", name2)
 
 	if !regexp.MustCompile(`(?m)^hello world`).MatchString(out) {
-		c.Fatal("did not get echo output from onbuild", out)
+		c.Fatalf("did not get echo output from onbuild. Got: %q", out)
 	}
 
 }
 
 func (s *DockerSuite) TestBuildOnBuildEntrypointJSON(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name1 := "onbuildcmd"
 	name2 := "onbuildgenerated"
 
@@ -583,7 +571,7 @@ ONBUILD ENTRYPOINT ["echo"]`,
 		c.Fatal(err)
 	}
 
-	out, _ := dockerCmd(c, "run", "-t", name2)
+	out, _ := dockerCmd(c, "run", name2)
 
 	if !regexp.MustCompile(`(?m)^hello world`).MatchString(out) {
 		c.Fatal("got malformed output from onbuild", out)
@@ -592,7 +580,7 @@ ONBUILD ENTRYPOINT ["echo"]`,
 }
 
 func (s *DockerSuite) TestBuildCacheAdd(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Windows doesn't have httpserver image yet
 	name := "testbuildtwoimageswithadd"
 	server, err := fakeStorage(map[string]string{
 		"robots.txt": "hello",
@@ -627,7 +615,7 @@ func (s *DockerSuite) TestBuildCacheAdd(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildLastModified(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Windows doesn't have httpserver image yet
 	name := "testbuildlastmodified"
 
 	server, err := fakeStorage(map[string]string{
@@ -693,9 +681,13 @@ RUN ls -le /file`
 }
 
 func (s *DockerSuite) TestBuildSixtySteps(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // TODO Windows: This test passes on Windows,
+	// but currently adds a disproportionate amount of time for the value it has.
+	// Removing it from Windows CI for now, but this will be revisited in the
+	// TP5 timeframe when perf is better.
 	name := "foobuildsixtysteps"
-	ctx, err := fakeContext("FROM scratch\n"+strings.Repeat("ADD foo /\n", 60),
+
+	ctx, err := fakeContext("FROM "+minimalBaseImage()+"\n"+strings.Repeat("ADD foo /\n", 60),
 		map[string]string{
 			"foo": "test1",
 		})
@@ -710,7 +702,7 @@ func (s *DockerSuite) TestBuildSixtySteps(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildAddSingleFileToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testaddimg"
 	ctx, err := fakeContext(fmt.Sprintf(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -736,7 +728,6 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`, expecte
 
 // Issue #3960: "ADD src ." hangs
 func (s *DockerSuite) TestBuildAddSingleFileToWorkdir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testaddsinglefiletoworkdir"
 	ctx, err := fakeContext(`FROM busybox
 ADD test_file .`,
@@ -763,7 +754,7 @@ ADD test_file .`,
 }
 
 func (s *DockerSuite) TestBuildAddSingleFileToExistDir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testaddsinglefiletoexistdir"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -789,7 +780,7 @@ RUN [ $(ls -l /exists/exists_file | awk '{print $3":"$4}') = 'dockerio:dockerio'
 }
 
 func (s *DockerSuite) TestBuildCopyAddMultipleFiles(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	server, err := fakeStorage(map[string]string{
 		"robots.txt": "hello",
 	})
@@ -834,9 +825,9 @@ RUN [ $(ls -l /exists/exists_file | awk '{print $3":"$4}') = 'dockerio:dockerio'
 }
 
 func (s *DockerSuite) TestBuildAddMultipleFilesToFile(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testaddmultiplefilestofile"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 	ADD file1.txt file2.txt test
 	`,
 		map[string]string{
@@ -856,9 +847,9 @@ func (s *DockerSuite) TestBuildAddMultipleFilesToFile(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildJSONAddMultipleFilesToFile(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testjsonaddmultiplefilestofile"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 	ADD ["file1.txt", "file2.txt", "test"]
 	`,
 		map[string]string{
@@ -878,9 +869,9 @@ func (s *DockerSuite) TestBuildJSONAddMultipleFilesToFile(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildAddMultipleFilesToFileWild(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testaddmultiplefilestofilewild"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 	ADD file*.txt test
 	`,
 		map[string]string{
@@ -900,9 +891,9 @@ func (s *DockerSuite) TestBuildAddMultipleFilesToFileWild(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildJSONAddMultipleFilesToFileWild(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testjsonaddmultiplefilestofilewild"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 	ADD ["file*.txt", "test"]
 	`,
 		map[string]string{
@@ -922,9 +913,9 @@ func (s *DockerSuite) TestBuildJSONAddMultipleFilesToFileWild(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildCopyMultipleFilesToFile(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopymultiplefilestofile"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 	COPY file1.txt file2.txt test
 	`,
 		map[string]string{
@@ -944,9 +935,9 @@ func (s *DockerSuite) TestBuildCopyMultipleFilesToFile(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildJSONCopyMultipleFilesToFile(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testjsoncopymultiplefilestofile"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 	COPY ["file1.txt", "file2.txt", "test"]
 	`,
 		map[string]string{
@@ -966,7 +957,7 @@ func (s *DockerSuite) TestBuildJSONCopyMultipleFilesToFile(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildAddFileWithWhitespace(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Not currently passing on Windows
 	name := "testaddfilewithwhitespace"
 	ctx, err := fakeContext(`FROM busybox
 RUN mkdir "/test dir"
@@ -1002,7 +993,7 @@ RUN [ $(cat "/test dir/test_file6") = 'test6' ]`,
 }
 
 func (s *DockerSuite) TestBuildCopyFileWithWhitespace(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Not currently passing on Windows
 	name := "testcopyfilewithwhitespace"
 	ctx, err := fakeContext(`FROM busybox
 RUN mkdir "/test dir"
@@ -1038,7 +1029,6 @@ RUN [ $(cat "/test dir/test_file6") = 'test6' ]`,
 }
 
 func (s *DockerSuite) TestBuildAddMultipleFilesToFileWithWhitespace(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testaddmultiplefilestofilewithwhitespace"
 	ctx, err := fakeContext(`FROM busybox
 	ADD [ "test file1", "test file2", "test" ]
@@ -1060,7 +1050,6 @@ func (s *DockerSuite) TestBuildAddMultipleFilesToFileWithWhitespace(c *check.C) 
 }
 
 func (s *DockerSuite) TestBuildCopyMultipleFilesToFileWithWhitespace(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopymultiplefilestofilewithwhitespace"
 	ctx, err := fakeContext(`FROM busybox
 	COPY [ "test file1", "test file2", "test" ]
@@ -1082,7 +1071,7 @@ func (s *DockerSuite) TestBuildCopyMultipleFilesToFileWithWhitespace(c *check.C)
 }
 
 func (s *DockerSuite) TestBuildCopyWildcard(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Windows doesn't have httpserver image yet
 	name := "testcopywildcard"
 	server, err := fakeStorage(map[string]string{
 		"robots.txt": "hello",
@@ -1133,7 +1122,6 @@ func (s *DockerSuite) TestBuildCopyWildcard(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildCopyWildcardNoFind(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopywildcardnofind"
 	ctx, err := fakeContext(`FROM busybox
 	COPY file*.txt /tmp/
@@ -1154,7 +1142,6 @@ func (s *DockerSuite) TestBuildCopyWildcardNoFind(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildCopyWildcardInName(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopywildcardinname"
 	ctx, err := fakeContext(`FROM busybox
 	COPY *.txt /tmp/
@@ -1179,7 +1166,6 @@ func (s *DockerSuite) TestBuildCopyWildcardInName(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildCopyWildcardCache(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopywildcardcache"
 	ctx, err := fakeContext(`FROM busybox
 	COPY file1.txt /tmp/`,
@@ -1213,7 +1199,7 @@ func (s *DockerSuite) TestBuildCopyWildcardCache(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildAddSingleFileToNonExistingDir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testaddsinglefiletononexistingdir"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1239,7 +1225,7 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`,
 }
 
 func (s *DockerSuite) TestBuildAddDirContentToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testadddircontenttoroot"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1263,7 +1249,7 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`,
 }
 
 func (s *DockerSuite) TestBuildAddDirContentToExistingDir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testadddircontenttoexistingdir"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1289,7 +1275,7 @@ RUN [ $(ls -l /exists/test_file | awk '{print $3":"$4}') = 'root:root' ]`,
 }
 
 func (s *DockerSuite) TestBuildAddWholeDirToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testaddwholedirtoroot"
 	ctx, err := fakeContext(fmt.Sprintf(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1317,9 +1303,9 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`, expecte
 
 // Testing #5941
 func (s *DockerSuite) TestBuildAddEtcToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testaddetctoroot"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 ADD . /`,
 		map[string]string{
 			"etc/test_file": "test1",
@@ -1336,7 +1322,7 @@ ADD . /`,
 
 // Testing #9401
 func (s *DockerSuite) TestBuildAddPreservesFilesSpecialBits(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testaddpreservesfilesspecialbits"
 	ctx, err := fakeContext(`FROM busybox
 ADD suidbin /usr/bin/suidbin
@@ -1359,7 +1345,7 @@ RUN [ $(ls -l /usr/bin/suidbin | awk '{print $1}') = '-rwsr-xr-x' ]`,
 }
 
 func (s *DockerSuite) TestBuildCopySingleFileToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testcopysinglefiletoroot"
 	ctx, err := fakeContext(fmt.Sprintf(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1385,7 +1371,6 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`, expecte
 
 // Issue #3960: "ADD src ." hangs - adapted for COPY
 func (s *DockerSuite) TestBuildCopySingleFileToWorkdir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopysinglefiletoworkdir"
 	ctx, err := fakeContext(`FROM busybox
 COPY test_file .`,
@@ -1412,7 +1397,7 @@ COPY test_file .`,
 }
 
 func (s *DockerSuite) TestBuildCopySingleFileToExistDir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testcopysinglefiletoexistdir"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1438,7 +1423,7 @@ RUN [ $(ls -l /exists/exists_file | awk '{print $3":"$4}') = 'dockerio:dockerio'
 }
 
 func (s *DockerSuite) TestBuildCopySingleFileToNonExistDir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testcopysinglefiletononexistdir"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1463,7 +1448,7 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`,
 }
 
 func (s *DockerSuite) TestBuildCopyDirContentToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testcopydircontenttoroot"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1487,7 +1472,7 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`,
 }
 
 func (s *DockerSuite) TestBuildCopyDirContentToExistDir(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testcopydircontenttoexistdir"
 	ctx, err := fakeContext(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1513,7 +1498,7 @@ RUN [ $(ls -l /exists/test_file | awk '{print $3":"$4}') = 'root:root' ]`,
 }
 
 func (s *DockerSuite) TestBuildCopyWholeDirToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // Linux specific test
 	name := "testcopywholedirtoroot"
 	ctx, err := fakeContext(fmt.Sprintf(`FROM busybox
 RUN echo 'dockerio:x:1001:1001::/bin:/bin/false' >> /etc/passwd
@@ -1540,9 +1525,9 @@ RUN [ $(ls -l /exists | awk '{print $3":"$4}') = 'dockerio:dockerio' ]`, expecte
 }
 
 func (s *DockerSuite) TestBuildCopyEtcToRoot(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopyetctoroot"
-	ctx, err := fakeContext(`FROM scratch
+
+	ctx, err := fakeContext(`FROM `+minimalBaseImage()+`
 COPY . /`,
 		map[string]string{
 			"etc/test_file": "test1",
@@ -1558,9 +1543,9 @@ COPY . /`,
 }
 
 func (s *DockerSuite) TestBuildCopyDisallowRemote(c *check.C) {
-	testRequires(c, DaemonIsLinux)
 	name := "testcopydisallowremote"
-	_, out, err := buildImageWithOut(name, `FROM scratch
+
+	_, out, err := buildImageWithOut(name, `FROM `+minimalBaseImage()+`
 COPY https://index.docker.io/robots.txt /`,
 		true)
 	if err == nil || !strings.Contains(out, "Source can't be a URL for COPY") {
@@ -1569,15 +1554,14 @@ COPY https://index.docker.io/robots.txt /`,
 }
 
 func (s *DockerSuite) TestBuildAddBadLinks(c *check.C) {
-	testRequires(c, DaemonIsLinux)
-	const (
-		dockerfile = `
-			FROM scratch
-			ADD links.tar /
-			ADD foo.txt /symlink/
-			`
-		targetFile = "foo.txt"
-	)
+	testRequires(c, DaemonIsLinux) // Not currently working on Windows
+
+	dockerfile := `
+		FROM scratch
+		ADD links.tar /
+		ADD foo.txt /symlink/
+		`
+	targetFile := "foo.txt"
 	var (
 		name = "test-link-absolute"
 	)
@@ -1656,7 +1640,7 @@ func (s *DockerSuite) TestBuildAddBadLinks(c *check.C) {
 }
 
 func (s *DockerSuite) TestBuildAddBadLinksVolume(c *check.C) {
-	testRequires(c, DaemonIsLinux)
+	testRequires(c, DaemonIsLinux) // ln not implemented on Windows busybox
 	const (
 		dockerfileTemplate = `
 		FROM busybox
@@ -1709,8 +1693,7 @@ func (s *DockerSuite) TestBuildAddBadLinksVolume(c *check.C) {
 // Issue #5270 - ensure we throw a better error than "unexpected EOF"
 // when we can't access files in the context.
 func (s *DockerSuite) TestBuildWithInaccessibleFilesInContext(c *check.C) {
-	testRequires(c, DaemonIsLinux)
-	testRequires(c, UnixCli) // test uses chown/chmod: not available on windows
+	testRequires(c, DaemonIsLinux, UnixCli) // test uses chown/chmod: not available on windows
 
 	{
 		name := "testbuildinaccessiblefiles"

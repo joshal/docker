@@ -54,6 +54,7 @@ weight = -1
       --mtu=0                                Set the containers network MTU
       --disable-legacy-registry              Do not contact legacy registries
       -p, --pidfile="/var/run/docker.pid"    Path to use for daemon PID file
+      --raw-logs                             Full timestamps without ANSI coloring
       --registry-mirror=[]                   Preferred Docker registry mirror
       -s, --storage-driver=""                Storage driver to use
       --selinux-enabled                      Enable selinux support
@@ -565,7 +566,7 @@ please check the [run](run.md) reference.
 
 ## Nodes discovery
 
-The `--cluster-advertise` option specifies the 'host:port' or `interface:port`
+The `--cluster-advertise` option specifies the `host:port` or `interface:port`
 combination that this particular daemon instance should use when advertising
 itself to the cluster. The daemon is reached by remote hosts through this value.
 If you  specify an interface, make sure it includes the IP address of the actual
@@ -860,19 +861,20 @@ This is a full example of the allowed configuration options in the file:
 	"group": "",
 	"cgroup-parent": "",
 	"default-ulimits": {},
-       "ipv6": false,
-       "iptables": false,
-       "ip-forward": false,
-       "ip-mask": false,
-       "userland-proxy": false,
-       "ip": "0.0.0.0",
-       "bridge": "",
-       "bip": "",
-       "fixed-cidr": "",
-       "fixed-cidr-v6": "",
-       "default-gateway": "",
-       "default-gateway-v6": "",
-       "icc": false
+	"ipv6": false,
+	"iptables": false,
+	"ip-forward": false,
+	"ip-mask": false,
+	"userland-proxy": false,
+	"ip": "0.0.0.0",
+	"bridge": "",
+	"bip": "",
+	"fixed-cidr": "",
+	"fixed-cidr-v6": "",
+	"default-gateway": "",
+	"default-gateway-v6": "",
+	"icc": false,
+	"raw-logs": false
 }
 ```
 

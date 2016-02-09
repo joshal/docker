@@ -748,6 +748,7 @@ _docker_daemon() {
 		--ip-masq=false
 		--iptables=false
 		--ipv6
+		--raw-logs
 		--selinux-enabled
 		--userland-proxy=false
 	"
@@ -1766,6 +1767,11 @@ _docker_run() {
 					if [ "${COMPREPLY[*]}" != "disable" ] ; then
 						__docker_nospace
 					fi
+					;;
+				seccomp:*)
+					local cur=${cur##*:}
+					_filedir
+					COMPREPLY+=( $( compgen -W "unconfined" -- "$cur" ) )
 					;;
 				*)
 					COMPREPLY=( $( compgen -W "label apparmor seccomp" -S ":" -- "$cur") )

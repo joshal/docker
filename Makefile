@@ -31,6 +31,7 @@ export DOCKERFILE
 # `docs/sources/contributing/devenvironment.md ` and `project/PACKAGERS.md` have some limited documentation of some of these
 DOCKER_ENVS := \
 	-e BUILDFLAGS \
+	-e KEEPBUNDLE \
 	-e DOCKER_BUILD_GOGC \
 	-e DOCKER_BUILD_PKGS \
 	-e DOCKER_CLIENTONLY \
@@ -115,4 +116,4 @@ test-unit: build
 	$(DOCKER_RUN_DOCKER) hack/make.sh test-unit
 
 validate: build
-	$(DOCKER_RUN_DOCKER) hack/make.sh validate-dco validate-gofmt validate-pkg validate-lint validate-test validate-toml validate-vet validate-vendor
+	$(DOCKER_RUN_DOCKER) hack/make.sh validate-dco validate-default-seccomp validate-gofmt validate-pkg validate-lint validate-test validate-toml validate-vet validate-vendor
